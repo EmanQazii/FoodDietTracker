@@ -10,52 +10,50 @@
 ## Backend Setup
 
 ### 1. Clone the repository
-\```bash
+\`
 git clone <your-repo-url>
-\```
+\`
 
 ### 2. Navigate to backend folder
-\```bash
+\`
 cd backend
-\```
+\`
 
 ### 3. Create virtual environment with Python 3.11
-\```bash
+\`
 python -m venv venv
-\```
+\`
 
 ### 4. Activate virtual environment
 
 **Windows:**
-\```bash
+\`
 venv\Scripts\activate
-\```
+\`
 
 **Mac/Linux:**
-\```bash
+\`
 source venv/bin/activate
-\```
+\`
 
 ### 5. Install dependencies
-\```bash
+\`
 pip install -r requirements.txt
-\```
+\`
 
 ### 6. Create .env file in backend/ folder
-\```
+\`
 DATABASE_URL=postgresql://postgres:yourpassword@localhost:5432/foodtracker
 SECRET_KEY=your-secret-key
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
-\```
+\`
 
 ### 7. Create PostgreSQL database
 Create a database named `foodtracker` in pgAdmin or psql.
 
 ### 8. Run the server
-\```bash
 uvicorn main:app --reload
-\```
 
 ---
 
@@ -72,8 +70,7 @@ uvicorn main:app --reload
 ---
 
 ## Project Structure
-
-\```
+\`
 food-tracker/
 ├── backend/
 │   ├── app/
@@ -92,7 +89,7 @@ food-tracker/
 ├── frontend/
 ├── .gitignore
 └── README.md
-\```
+\`
 
 ---
 

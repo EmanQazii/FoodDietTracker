@@ -44,4 +44,14 @@ def get_meal(
     if not meal:
         raise HTTPException(status_code=404, detail="Meal not found")
 
-    return meal
+    return {
+        "id": meal.id,
+        "food_label": meal.food_label,
+        "confidence": meal.confidence,
+        "calorie_min": meal.calorie_min,
+        "calorie_max": meal.calorie_max,
+        "calorie_category": meal.calorie_category,
+        "meal_type": meal.meal_type,
+        "image_path": meal.image_path,
+        "created_at": meal.created_at
+    }
