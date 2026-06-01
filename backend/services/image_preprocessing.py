@@ -1,7 +1,5 @@
 import cv2
 import numpy as np
-from PIL import Image
-import io
 
 def load_image_from_bytes(image_bytes: bytes) -> np.ndarray:
     nparr = np.frombuffer(image_bytes, np.uint8)
@@ -13,55 +11,90 @@ def resize_image(img: np.ndarray, size=(224, 224)) -> np.ndarray:
 
 def clahe_equalization(img: np.ndarray) -> np.ndarray:
     lab = cv2.cvtColor(img, cv2.COLOR_RGB2LAB)
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    clahe = cv2.createCLAHE(
+        clipLimit=2.0,
+        tileGridSize=(8, 8)
+    )
     lab[:, :, 0] = clahe.apply(lab[:, :, 0])
     return cv2.cvtColor(lab, cv2.COLOR_LAB2RGB)
 
-def apply_gaussian_blur(img: np.ndarray) -> np.ndarray:
-    return cv2.GaussianBlur(img, (5, 5), 0)
+def denoise_image(img: np.ndarray) -> np.ndarray:
+    return cv2.fastNlMeansDenoisingColored(
+        img,
+        None,
+        10,
+        10,
+        7,
+        21
+    )
 
-def compute_psnr(original: np.ndarray, processed: np.ndarray) -> float:
+def unsharp_mask(img: np.ndarray) -> np.ndarray:
+    blur = cv2.GaussianBlur(img, (0, 0), 3)
+    sharpened = cv2.addWeighted(
+        img,
+        1.5,
+        blur,
+        -0.5,
+        0
+    )
+    return sharpened
+
+def compute_psnr(original: np.ndarray,
+                 processed: np.ndarray) -> float:
+
     orig = original.astype(np.float64)
     proc = processed.astype(np.float64)
+
     mse = np.mean((orig - proc) ** 2)
+
     if mse == 0:
         return 100.0
-    return round(20 * np.log10(255.0 / np.sqrt(mse)), 2)
+
+    return round(
+        20 * np.log10(255.0 / np.sqrt(mse)),
+        2
+    )
 
 def preprocess_for_model(image_bytes: bytes) -> tuple:
     """
-    Full pipeline:
-    1. Load from bytes (user upload)
-    2. Resize
-    3. Enhance
-    4. Blur
-    5. Quality check
-    6. Return numpy array ready for model
+    Production Pipeline
+
+    1. Load uploaded image
+    2. Resize to 224x224
+    3. CLAHE enhancement
+    4. Non-Local Means denoising
+    5. Unsharp masking
+    6. PSNR quality validation
+    7. MobileNetV2 preprocessing
     """
-    # load
+
+    # Load
     original = load_image_from_bytes(image_bytes)
 
-    # resize
+    # Resize
     resized = resize_image(original)
 
-    # enhance lighting
+    # Contrast enhancement
     enhanced = clahe_equalization(resized)
 
-    # noise removal
-    processed = apply_gaussian_blur(enhanced)
+    # Edge-preserving denoising
+    denoised = denoise_image(enhanced)
 
-    # quality check
+    # Sharpen important food details
+    processed = unsharp_mask(denoised)
+
+    # Quality validation
     psnr_val = compute_psnr(resized, processed)
 
-    # if enhancement degraded quality too much fallback to just resized
-    if psnr_val < 20:
+    # Fallback if preprocessing becomes too aggressive
+    if psnr_val < 18:
         processed = resized
 
-    # convert to float32 and apply MobileNetV2 preprocessing
+    # MobileNetV2 preprocessing
     img_array = processed.astype(np.float32)
-    img_array = (img_array / 127.5) - 1.0  # MobileNetV2 preprocess_input equivalent
+    img_array = (img_array / 127.5) - 1.0
 
-    # add batch dimension
+    # Batch dimension
     img_array = np.expand_dims(img_array, axis=0)
 
     return img_array, psnr_val

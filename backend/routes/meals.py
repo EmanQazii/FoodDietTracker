@@ -1,11 +1,56 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
+from typing import Optional
 from app.database import get_db
 from models.meal import Meal
 from models.user import User
 from utils.dependencies import get_current_user
 
 router = APIRouter()
+
+
+class SaveMealRequest(BaseModel):
+    food_label: str
+    confidence: Optional[str] = None
+    calorie_min: Optional[int] = 0
+    calorie_max: Optional[int] = 0
+    calorie_category: Optional[str] = None
+    meal_type: str = "lunch"
+    image_path: Optional[str] = None
+
+
+@router.post("/meals", status_code=201)
+def save_meal(
+    request: SaveMealRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # parse confidence — Flutter sends it as "87%" or "87.5"
+    confidence_val = 0.0
+    if request.confidence:
+        cleaned = request.confidence.replace('%', '').strip()
+        try:
+            confidence_val = float(cleaned)
+        except ValueError:
+            confidence_val = 0.0
+
+    meal = Meal(
+        user_id=current_user.id,
+        food_label=request.food_label,
+        confidence=confidence_val,
+        calorie_min=request.calorie_min or 0,
+        calorie_max=request.calorie_max or 0,
+        calorie_category=request.calorie_category or "",
+        meal_type=request.meal_type.lower(),
+        image_path=request.image_path or ""
+    )
+    db.add(meal)
+    db.commit()
+    db.refresh(meal)
+
+    return {"success": True, "meal_id": meal.id}
+
 
 @router.get("/meals")
 def get_meals(
@@ -29,6 +74,7 @@ def get_meals(
         }
         for m in meals
     ]
+
 
 @router.get("/meals/{meal_id}")
 def get_meal(

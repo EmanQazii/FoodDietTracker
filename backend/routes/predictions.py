@@ -33,18 +33,6 @@ async def predict(
     if confidence < 0.45 or food_label == "unknown":
         top3 = get_top3_predictions(raw_predictions)
 
-    meal = save_meal_with_prediction(
-        db=db,
-        user_id=current_user.id,
-        image_path=file.filename,
-        food_label=food_label,
-        confidence=confidence,
-        calorie_min=calorie_info["min"],
-        calorie_max=calorie_info["max"],
-        calorie_category=calorie_info["category"],
-        meal_type=meal_type
-    )
-
     return {
         "food_label": food_label,
         "food_name": get_display_name(food_label),
@@ -57,56 +45,40 @@ async def predict(
         "message": calorie_info.get("message", ""),
         "source": calorie_info.get("source", ""),
         "disclaimer": CALORIE_DISCLAIMER,
-        "top3_suggestions": top3,        # None when confidence is fine
-        "psnr": psnr_val,
-        "meal_id": meal.id
+        "top3_suggestions": top3,      
+        "psnr": psnr_val
     }
 
 
 # ── new manual entry route ──────────────────────────────────────────────────
-
 class ManualEntryRequest(BaseModel):
     food_name: str
     meal_type: str = "lunch"
+    serving_size: str = "medium"  # small / medium / large
 
 @router.post("/predict/manual")
 async def predict_manual(
     request: ManualEntryRequest,
-    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     food_name = request.food_name.strip().lower()
 
-    # try USDA first
-    usda_result = get_calories_from_usda(food_name)
+    usda_result = get_calories_from_usda(food_name, request.serving_size)
 
     if usda_result:
         calorie_min = usda_result["min"]
         calorie_max = usda_result["max"]
         calorie_category = usda_result["category"]
-        dietary_flag = None          # USDA doesn't give us this
         source = "USDA FoodData Central"
-        message = f"Nutrition data fetched from USDA for '{food_name}' (estimated per {usda_result['per_serving_g']}g serving)."
+        message = f"Nutrition data for '{food_name}' estimated per {usda_result['per_serving_g']}g ({request.serving_size} serving)."
+        is_unknown = False
     else:
-        # USDA returned nothing, still save with zeros and tell user
         calorie_min = 0
         calorie_max = 0
         calorie_category = "Unknown"
-        dietary_flag = None
         source = "Not found"
-        message = f"'{food_name}' was not found in USDA database. Meal saved without calorie data."
-
-    meal = save_meal_with_prediction(
-        db=db,
-        user_id=current_user.id,
-        image_path="manual_entry",
-        food_label=food_name,
-        confidence=1.0,              # user confirmed, so treat as certain
-        calorie_min=calorie_min,
-        calorie_max=calorie_max,
-        calorie_category=calorie_category,
-        meal_type=request.meal_type
-    )
+        message = f"'{food_name}' was not found in USDA database."
+        is_unknown = True
 
     return {
         "food_label": food_name,
@@ -115,11 +87,29 @@ async def predict_manual(
         "calorie_min": calorie_min,
         "calorie_max": calorie_max,
         "calorie_category": calorie_category,
-        "dietary_flag": dietary_flag,
-        "is_unknown": calorie_min == 0,
+        "dietary_flag": None,
+        "is_unknown": is_unknown,
         "source": source,
         "message": message,
         "disclaimer": CALORIE_DISCLAIMER,
-        "top3_suggestions": None,
-        "meal_id": meal.id
+        "top3_suggestions": None
+    }
+
+class CalorieLookupRequest(BaseModel):
+    food_name: str
+
+@router.post("/calories/lookup")
+async def calories_lookup(
+    request: CalorieLookupRequest,
+    current_user: User = Depends(get_current_user)
+):
+    label = request.food_name.strip().lower().replace(" ", "_")
+    calorie_info = get_calorie_info(label)
+    return {
+        "calorie_min": calorie_info["min"],
+        "calorie_max": calorie_info["max"],
+        "calorie_category": calorie_info["category"],
+        "dietary_flag": calorie_info.get("dietary_flag"),
+        "is_unknown": calorie_info.get("is_unknown", False),
+        "disclaimer": CALORIE_DISCLAIMER,
     }
