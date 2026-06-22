@@ -20,6 +20,16 @@ class SaveMealRequest(BaseModel):
     image_path: Optional[str] = None
 
 
+class UpdateMealRequest(BaseModel):
+    food_label: Optional[str] = None
+    confidence: Optional[str] = None
+    calorie_min: Optional[int] = None
+    calorie_max: Optional[int] = None
+    calorie_category: Optional[str] = None
+    meal_type: Optional[str] = None
+    image_path: Optional[str] = None
+
+
 @router.post("/meals", status_code=201)
 def save_meal(
     request: SaveMealRequest,
@@ -101,3 +111,45 @@ def get_meal(
         "image_path": meal.image_path,
         "created_at": meal.created_at
     }
+
+
+@router.put("/meals/{meal_id}")
+def update_meal(
+    meal_id: int,
+    request: UpdateMealRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    meal = db.query(Meal).filter(
+        Meal.id == meal_id,
+        Meal.user_id == current_user.id
+    ).first()
+
+    if not meal:
+        raise HTTPException(status_code=404, detail="Meal not found")
+
+    if request.food_label is not None:
+        meal.food_label = request.food_label
+
+    if request.confidence is not None:
+        cleaned = request.confidence.replace('%', '').strip()
+        try:
+            meal.confidence = float(cleaned)
+        except ValueError:
+            meal.confidence = 0.0
+
+    if request.calorie_min is not None:
+        meal.calorie_min = request.calorie_min
+    if request.calorie_max is not None:
+        meal.calorie_max = request.calorie_max
+    if request.calorie_category is not None:
+        meal.calorie_category = request.calorie_category
+    if request.meal_type is not None:
+        meal.meal_type = request.meal_type.lower()
+    if request.image_path is not None:
+        meal.image_path = request.image_path
+
+    db.commit()
+    db.refresh(meal)
+
+    return {"success": True, "meal_id": meal.id}

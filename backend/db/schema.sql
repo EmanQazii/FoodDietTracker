@@ -29,7 +29,6 @@ CREATE TABLE predictions (
     meal_id INTEGER NOT NULL REFERENCES meals(id) ON DELETE CASCADE,
     predicted_label VARCHAR(100) NOT NULL,
     confidence_score FLOAT NOT NULL CHECK (confidence_score >= 0 AND confidence_score <= 1),
-    model_version VARCHAR(50) DEFAULT 'v1.0',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

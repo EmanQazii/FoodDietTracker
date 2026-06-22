@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import Base, engine
 from routes import auth, meals, predictions, analytics
+from services.ml_model import load_model_once
 
 # create all tables
 Base.metadata.create_all(bind=engine)
@@ -26,6 +27,11 @@ app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 app.include_router(predictions.router, prefix="/api", tags=["Predictions"])
 app.include_router(meals.router, prefix="/api", tags=["Meals"])
 app.include_router(analytics.router, prefix="/api", tags=["Analytics"])
+
+# pre-load ML model on startup to reduce first prediction latency
+@app.on_event("startup")
+async def startup_event():
+    load_model_once()
 
 @app.get("/")
 def root():
