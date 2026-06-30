@@ -17,9 +17,9 @@ class ApiService {
 
   // ── Base URL ──────────────────────────────────────────────
   static String get baseUrl {
-    if (kIsWeb) return "http://localhost:8000";
-    if (Platform.isAndroid) return "http://10.135.128.228:8000";
-    return "http://10.135.128.228:8000";
+    if (kIsWeb) return "https://fooddiettracker.onrender.com";
+    if (Platform.isAndroid) return "https://fooddiettracker.onrender.com";
+    return "https://fooddiettracker.onrender.com";
   }
 
   // ── Exposed getters ───────────────────────────────────────
